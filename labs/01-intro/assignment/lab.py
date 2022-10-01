@@ -2,10 +2,13 @@
 
 
 import os
+import time
 import io
 import pandas as pd
 import numpy as np
 import doctest
+
+from sphinx.addnodes import index
 
 
 # ---------------------------------------------------------------------
@@ -61,13 +64,17 @@ def median_vs_mean(nums):
     >>> median_vs_mean([1, 8, 9])
     False
     '''
-    ...
+    srt = sorted(nums)
+    median = srt[int((len(srt) + 1) / 2) - 1]
+    mean = sum(srt) / len(srt)
+    return median <= mean
+
+
 
 
 # ---------------------------------------------------------------------
 # QUESTION 2
 # ---------------------------------------------------------------------
-
 
 def same_diff_ints(ints):
     """
@@ -82,8 +89,36 @@ def same_diff_ints(ints):
     True
     >>> same_diff_ints([1, 3, 5, 7, 9])
     False
+    >>> same_diff_ints([1, 1, 1, -1])
+    True
+    >>> time1_start = time.time()
+    >>> _ = same_diff_ints([1]*1000 + [2])
+    >>> time1_end = time.time()
+    >>> time1 = time1_end - time1_start
+    >>> time2_start = time.time()
+    >>> _ = same_diff_ints([1]*1000 + [1001])
+    >>> time2_end = time.time()
+    >>> time2 = time2_end - time2_start
+    >>> time2 - 10 * time1 > 0
+    True
     """
-    ...
+
+
+    if len(ints) == 0:
+        return False
+
+    for i in range(len(ints)):
+        a = i + 1
+        while a < len(ints):
+            # print(i, a, ints[i], ints[a], i - a, ints[i] - ints[a])
+            diff = abs(ints[i] - ints[a])
+            num_diff = abs(i - a)
+            if num_diff == diff:
+                return True
+            a += 1
+    return False
+
+
 
 
 # ---------------------------------------------------------------------
@@ -109,8 +144,17 @@ def n_prefixes(s, n):
     'aaa'
     >>> n_prefixes('Justin', 5)
     'JustiJustJusJuJ'
+    >>> n_prefixes('', 1)
+    ''
     """
-    ...
+    if len(s) == 0:
+        return ""
+    new_str = ""
+    while n > 0:
+        for i in range(0, n):
+            new_str += s[i]
+        n -= 1
+    return new_str
 
 
 # ---------------------------------------------------------------------
@@ -134,7 +178,27 @@ def exploded_numbers(ints, n):
     >>> exploded_numbers([9, 99], 3)
     ['006 007 008 009 010 011 012', '096 097 098 099 100 101 102']
     """
-    ...
+
+    exploded = []
+    a = 0
+    max_len = len(str(max(ints) + n))
+    while a < len(ints):
+        str_explode = ""
+        lowest = ints[a] - n
+        highest = ints[a] + n
+        x = lowest
+        while x <= highest:
+            str_x = str(x)
+            zeroes = ""
+            while (len(str_x) + len(zeroes)) < max_len:
+                zeroes += "0"
+            str_x = zeroes + str_x
+            str_explode += str_x + " "
+            x += 1
+        str_explode = str_explode[:-1]
+        exploded.append(str_explode)
+        a += 1
+    return exploded
 
 
 # ---------------------------------------------------------------------
@@ -153,7 +217,13 @@ def last_chars(fh):
     >>> last_chars(open(fp))
     'hrg'
     """
-    ...
+
+    ret_str = ""
+    with open(fh.name, "r") as f:
+        for line in f:
+            ret_str += line[-2]
+    return ret_str
+
 
 
 # ---------------------------------------------------------------------
@@ -267,7 +337,33 @@ def salary_stats(salary):
     >>> isinstance(out.loc['duplicates'], bool)
     True
     """
-    ...
+    stats_series = pd.Series()
+    stats_series["num_players"] = salary.shape[0]
+    stats_series["num_teams"] = salary.get("Team").nunique()
+    stats_series["total_salary"] = sum(salary.get("Salary"))
+    stats_series["highest_salary"] = salary.get("Salary").max()
+    stats_series["avg_bos"] = round(salary[salary.get("Team") == "BOS"].get("Salary").mean(), 2)
+    stats_series["third_lowest"] = (
+    salary.sort_values("Salary").get("Player").iloc[2], salary.sort_values("Salary").get("Team").iloc[2])
+    last_names = []
+    for name in salary.get("Player"):
+        first_last = name.split(" ")
+        last_names.append(first_last[1])
+    last_counts = {}
+    for name in last_names:
+        if name in last_counts.keys():
+            last_counts[name] += 1
+        else:
+            last_counts[name] = 1
+    for value in last_counts.values():
+        if value != 0:
+            stats_series["duplicates"] = True
+            break
+    else:
+        stats_series["duplicates"] = False
+    highest_paid = salary.sort_values("Salary").get("Team").iloc[-1]
+    stats_series["total_highest"] = salary[salary.get("Team") == highest_paid].get("Salary").sum()
+    return stats_series
 
 
 # ---------------------------------------------------------------------
@@ -302,4 +398,35 @@ def parse_malformed(fp):
     >>> (dg == df.iloc[9:13]).all().all()
     True
     """
-    ...
+    formed = pd.DataFrame()
+    i = 0
+    cols = []
+    with open(fp, "r") as f:
+        for line in f:
+            if line[-1] != '"':
+                line = line[:-1]
+            line = line.replace("\n", "").replace(",,", ",")
+            items = line.split(",")
+            if len(items) > 6:
+                items = items[0:-1]
+            if i == 0:
+                for item in items:
+                    formed[item] = 0
+                cols = items
+            else:
+                geo = str(items[-2:])[1:-1]
+                items = items[0:-2]
+                geo = geo.replace('"', "").replace("'", "").replace(" ", "")
+                items2 = []
+                for item in items:
+                    item = item.replace('"', "").replace("'", "")
+                    items2.append(item)
+                items = items2
+                items.append(geo)
+                df_add = pd.DataFrame(items, index=cols)
+                df_add = df_add.transpose()
+                formed = formed.append(df_add)
+            i += 1
+    formed = formed.reset_index().drop(columns=["index"])
+    formed = formed.astype({"first": str, "last": str, "weight": float, "height": float, "geo": str})
+    return formed
